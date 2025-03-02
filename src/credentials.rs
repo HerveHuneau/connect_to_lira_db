@@ -3,15 +3,19 @@ use std::process::{Command, Output};
 use anyhow::{Context, Result};
 use regex::Regex;
 
-use crate::cli::Environment;
+use crate::cli::{Args, Environment};
 
 pub struct Credentials(pub String, pub String);
 
-impl Credentials {
-    pub fn try_from(env: &Environment) -> Result<Self> {
-        match env {
+impl TryFrom<&Args> for Credentials {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &Args) -> std::result::Result<Self, Self::Error> {
+        match value.environment {
             Environment::Local => Ok(Credentials("postgres".to_string(), "postgres".to_string())),
-            Environment::Staging | Environment::Production => get_remote_credentials(env),
+            Environment::Staging | Environment::Production => {
+                get_remote_credentials(&value.environment)
+            }
         }
     }
 }

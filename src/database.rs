@@ -2,7 +2,10 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
-use crate::{cli::Environment, credentials::Credentials};
+use crate::{
+    cli::{Args, Environment::*},
+    credentials::Credentials,
+};
 
 pub struct Config {
     pub db_host: String,
@@ -12,31 +15,30 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(env: &Environment, db_name: &str, credentials: Credentials) -> Self {
-        let db_host = match env {
-            Environment::Local => LOCAL_HOST,
-            Environment::Staging => STAGING_HOST,
-            Environment::Production => PROD_HOST,
-        }
-        .to_string();
+    pub fn new(args: Args, credentials: Credentials) -> Self {
+        let db_host = match args.environment {
+            Local => LOCAL_HOST,
+            Staging => STAGING_HOST,
+            Production => PROD_HOST,
+        };
         Self {
-            db_host,
-            db_name: db_name.to_string(),
+            db_host: db_host.to_string(),
+            db_name: args.db_name,
             username: credentials.0,
             password: credentials.1,
         }
     }
-}
 
-pub fn connect_to_db(config: Config) -> Result<()> {
-    Command::new("pgcli")
-        .arg(format!(
-            "postgres://{}:{}@{}/{}",
-            config.username, config.password, config.db_host, config.db_name
-        ))
-        .status()
-        .context("Failed to connect to the database")
-        .map(|_| ())
+    pub fn connect(&self) -> Result<()> {
+        Command::new("pgcli")
+            .arg(format!(
+                "postgres://{}:{}@{}/{}",
+                self.username, self.password, self.db_host, self.db_name
+            ))
+            .status()
+            .context("Failed to connect to the database")
+            .map(|_| ())
+    }
 }
 
 const LOCAL_HOST: &str = "postgres:15432";
