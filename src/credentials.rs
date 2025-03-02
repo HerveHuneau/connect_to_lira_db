@@ -1,0 +1,73 @@
+use std::process::{Command, Output};
+
+use anyhow::{Context, Result};
+use regex::Regex;
+
+use crate::cli::Environment;
+
+pub struct Credentials(pub String, pub String);
+
+impl Credentials {
+    pub fn try_from(env: &Environment) -> Result<Self> {
+        match env {
+            Environment::Local => Ok(Credentials("postgres".to_string(), "postgres".to_string())),
+            Environment::Staging | Environment::Production => get_remote_credentials(env),
+        }
+    }
+}
+
+fn get_remote_credentials(environment: &Environment) -> Result<Credentials> {
+    let credentials = fetch_credentials(environment)?;
+    let credentials_output = match credentials.status.code() {
+        Some(0) => String::from_utf8_lossy(&credentials.stdout).to_string(),
+        Some(2) => {
+            login()?;
+            let credentials = fetch_credentials(environment)?;
+            String::from_utf8_lossy(&credentials.stdout).to_string()
+        }
+        _ => Err(anyhow::anyhow!(
+            "Failed to fetch credentials: {}",
+            String::from_utf8_lossy(&credentials.stderr)
+        ))?,
+    };
+    parse_credentials(credentials_output)
+}
+
+fn fetch_credentials(environment: &Environment) -> Result<Output> {
+    Command::new("vault")
+        .arg("read")
+        .arg(format!(
+            "database/payments/creds/SWEngineerDomainPaymentsTeamCreditCardProcessing-Onyx-payments-{}-postgres",
+            environment.to_string().to_lowercase()
+        ))
+        .output()
+        .context("vault read didn't finish successfully")
+}
+
+fn login() -> Result<()> {
+    Command::new("vault")
+        .arg("login")
+        .arg("-address=https://vault.helloprima.com:8200/")
+        .arg("-method=oidc")
+        .arg("-path=okta")
+        .status()
+        .context("vault login didn't finish successfully")
+        .and_then(|status| match status.code() {
+            Some(0) => Ok(()),
+            _ => Err(anyhow::anyhow!("Failed to login to vault")),
+        })
+}
+
+fn parse_credentials(output_str: String) -> Result<Credentials> {
+    let re_password = Regex::new(r"(?m)^password\s+(\S+)\s*$").unwrap();
+    let re_username = Regex::new(r"(?m)^username\s+(\S+)\s*$").unwrap();
+    let username = re_username
+        .captures(&output_str)
+        .and_then(|cap| cap.get(1).map(|m| m.as_str()))
+        .context("Could not parse username")?;
+    let password = re_password
+        .captures(&output_str)
+        .and_then(|cap| cap.get(1).map(|m| m.as_str()))
+        .context("Could not parse password")?;
+    Ok(Credentials(username.to_owned(), password.to_owned()))
+}
