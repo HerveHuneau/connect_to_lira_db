@@ -2,15 +2,12 @@ use clap::Parser;
 use clap::ValueEnum;
 use std::fmt;
 
-/// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct Args {
-    /// Environment
     #[arg(short, long)]
     pub environment: Environment,
 
-    /// Database name
     #[arg(short, long)]
     pub db_name: String,
 }

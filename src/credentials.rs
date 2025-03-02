@@ -5,19 +5,32 @@ use regex::Regex;
 
 use crate::cli::{Args, Environment};
 
-pub struct Credentials(pub String, pub String);
+pub struct Credentials {
+    pub username: String,
+    pub password: String,
+}
+
+impl Credentials {
+    pub fn new(username: String, password: String) -> Self {
+        Self { username, password }
+    }
+}
 
 impl TryFrom<&Args> for Credentials {
     type Error = anyhow::Error;
 
     fn try_from(value: &Args) -> std::result::Result<Self, Self::Error> {
         match value.environment {
-            Environment::Local => Ok(Credentials("postgres".to_string(), "postgres".to_string())),
+            Environment::Local => Ok(get_local_credentials()),
             Environment::Staging | Environment::Production => {
                 get_remote_credentials(&value.environment)
             }
         }
     }
+}
+
+fn get_local_credentials() -> Credentials {
+    Credentials::new("postgres".to_string(), "postgres".to_string())
 }
 
 fn get_remote_credentials(environment: &Environment) -> Result<Credentials> {
@@ -73,5 +86,5 @@ fn parse_credentials(output_str: String) -> Result<Credentials> {
         .captures(&output_str)
         .and_then(|cap| cap.get(1).map(|m| m.as_str()))
         .context("Could not parse password")?;
-    Ok(Credentials(username.to_owned(), password.to_owned()))
+    Ok(Credentials::new(username.to_owned(), password.to_owned()))
 }

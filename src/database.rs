@@ -24,8 +24,8 @@ impl Config {
         Self {
             db_host: db_host.to_string(),
             db_name: args.db_name,
-            username: credentials.0,
-            password: credentials.1,
+            username: credentials.username,
+            password: credentials.password,
         }
     }
 
