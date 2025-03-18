@@ -35,6 +35,7 @@ impl Config {
                 "postgres://{}:{}@{}/{}",
                 self.username, self.password, self.db_host, self.db_name
             ))
+            .env("PGOPTIONS", format!("--search_path={}", self.db_name))
             .status()
             .context("Failed to connect to the database")
             .map(|_| ())
